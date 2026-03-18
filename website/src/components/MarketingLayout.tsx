@@ -48,6 +48,14 @@ export function MarketingNav({ transparent = false }: MarketingNavProps) {
           >
             Use Cases
           </a>
+          <a
+            href="https://github.com/dotbrains/sluice/blob/master/PAPER.md"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-cream/80 hover:text-cream transition-colors text-sm font-medium"
+          >
+            Paper
+          </a>
           <div className="flex items-center gap-3 ml-2">
             <a
               href="https://github.com/dotbrains/sluice"
@@ -102,6 +110,14 @@ export function MarketingNav({ transparent = false }: MarketingNavProps) {
               className="block text-cream/80 hover:text-cream transition-colors text-base font-medium py-2"
             >
               Use Cases
+            </a>
+            <a
+              href="https://github.com/dotbrains/sluice/blob/master/PAPER.md"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block text-cream/80 hover:text-cream transition-colors text-base font-medium py-2"
+            >
+              Paper
             </a>
             <div className="pt-4 space-y-3 border-t border-sluice-blue/20">
               <a
@@ -211,6 +227,12 @@ export function MarketingFooter() {
               <li>
                 <a href="https://github.com/dotbrains/sluice/blob/master/SPEC.md" className="text-cream/70 hover:text-cream text-sm transition-colors inline-flex items-center gap-1.5" target="_blank" rel="noopener noreferrer">
                   Specification
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </li>
+              <li>
+                <a href="https://github.com/dotbrains/sluice/blob/master/PAPER.md" className="text-cream/70 hover:text-cream text-sm transition-colors inline-flex items-center gap-1.5" target="_blank" rel="noopener noreferrer">
+                  Paper
                   <ExternalLink className="w-3 h-3" />
                 </a>
               </li>

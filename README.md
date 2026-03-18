@@ -161,6 +161,12 @@ WITH batch AS ( ... )
 
 See [SPEC.md](SPEC.md) for the full API reference, architecture diagrams, and design decisions.
 
+## Paper
+
+A technical paper describing sluice's design and contributions is available in the repo:
+
+[**PAPER.md**](PAPER.md) — covers the batched execution model, cycle-detection invariant, resume semantics, annotation-driven interleaving, and git-aware version management, with comparisons to related tools (Flyway, Liquibase, Sqitch, golang-migrate, Django migrations).
+
 ## Dependencies
 
 - **[PostgreSQL](https://www.postgresql.org/)** — target database
