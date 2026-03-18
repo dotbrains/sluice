@@ -78,6 +78,24 @@ Each pass runs inside its own transaction. This is a deliberate design choice: r
 
 The `LIMIT` clause is required and enforced at parse time. A backfill without a `LIMIT` clause throws before any rows are touched. This is not a recommendation — it is a hard gate.
 
+```mermaid
+flowchart TD
+    A[Read SQL file] --> B{LIMIT clause present?}
+    B -- No --> C[Throw: missing LIMIT]
+    B -- Yes --> D[Execute SQL in tx]
+    D --> E{rowCount == 0?}
+    E -- Yes --> F[markCompleted]
+    F --> G([Done])
+    E -- No --> H{prevWasPartialBatch?}
+    H -- Yes --> I[Throw: cycle detected]
+    H -- No --> J{rowCount < LIMIT?}
+    J -- Yes --> K[prevWasPartialBatch = true]
+    J -- No --> L[prevWasPartialBatch = false]
+    K --> M[Wait batchDelayMs]
+    L --> M
+    M --> D
+```
+
 ### 3.2 Cycle Detection via the Partial-Batch Invariant
 
 The most common bug in a batched backfill is a `WHERE` clause that does not exclude already-processed rows. If `UPDATE ... SET status = 'active' WHERE status IS NULL` is used but the update sets `status` to something other than `'active'`, every pass will select the same rows forever.
@@ -91,6 +109,18 @@ Backfill 003 (add-status) cycle detected: rows returned after partial batch
 This invariant has no false positives in practice. The only scenario where it fires incorrectly would be concurrent writes adding new qualifying rows between passes faster than the backfill processes them — a scenario that implies the backfill's `WHERE` clause is not converging, which is itself a bug.
 
 The detection state is a single boolean, `prevWasPartialBatch`, maintained across passes in the batch loop. It adds zero database overhead.
+
+```mermaid
+flowchart LR
+    A["Pass N: rowCount = LIMIT"] --> B[Full batch]
+    B --> C["prevWasPartialBatch = false"]
+    C --> D["Pass N+1: rowCount < LIMIT"]
+    D --> E[Partial batch]
+    E --> F["prevWasPartialBatch = true"]
+    F --> G{"Pass N+2: rowCount?"}
+    G -- "== 0" --> H(["✓ Complete"])
+    G -- "> 0" --> I(["✗ Cycle detected — throw"])
+```
 
 ### 3.3 Resume Semantics via the `completed` Column
 
@@ -106,6 +136,16 @@ The `completed` column is set to `true` only after `rowCount === 0` on a batch p
 On the next run, `resumeIncompleteBackfills` queries for all versions with `completed = false`, finds their SQL files on disk, and re-runs their batch loops. Because the `WHERE` clause is idempotent, already-processed rows are not reselected. Resume is free.
 
 This design separates *registration* (Postgrator's concern) from *completion* (sluice's concern). Postgrator handles version ordering, file discovery, and table creation. sluice handles whether the actual data work is done.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Unregistered
+    Unregistered --> Incomplete : Postgrator registers version (completed = false)
+    Incomplete --> Incomplete : Batch pass: rowCount > 0
+    Incomplete --> Incomplete : Process killed — restart resumes loop
+    Incomplete --> Complete : Batch pass: rowCount == 0 → markCompleted
+    Complete --> [*]
+```
 
 ### 3.4 Interleaved Ordering via SQL Annotations
 
@@ -132,6 +172,27 @@ The annotation lives in the SQL file itself. There is no external configuration 
 
 The interleaving logic handles partial progress: if migrations are already ahead of backfills (e.g., a previous interrupted run), the dependency steps that have already been satisfied are skipped via version comparison, and execution resumes at the first unsatisfied step.
 
+```mermaid
+sequenceDiagram
+    participant IL as runMigrationsAndBackfills
+    participant MR as runMigrations
+    participant BR as runBackfills
+    participant DB as PostgreSQL
+
+    IL->>IL: buildDependencySteps()<br/>parse @migration annotations
+    Note over IL: steps = [{migration:50, backfill:1}, {migration:75, backfill:2}]
+    IL->>MR: migrate up to v50
+    MR->>DB: apply migrations 1–50
+    IL->>BR: backfill up to v1
+    BR->>DB: batch loop
+    IL->>MR: migrate up to v75
+    MR->>DB: apply migrations 51–75
+    IL->>BR: backfill up to v2
+    BR->>DB: batch loop
+    IL->>MR: remaining migrations
+    MR->>DB: apply migrations 76–N
+```
+
 ### 3.5 Git-Aware Version Collision Resolution
 
 #### 3.5.1 Problem Statement
@@ -155,6 +216,28 @@ The algorithm:
 7. Renumber branch-only files sequentially starting at `targetMax + 1`.
 
 File renaming uses `git show <ourRef>:<path>` to extract clean file content from the correct ref, writes it to the new path, and deletes the old path. This works correctly even when the old path is a merge conflict marker in the working tree.
+
+```mermaid
+flowchart TD
+    A([sluice renumber]) --> B[detectGitState]
+    B --> C{Git state?}
+    C -- proactive --> D[targetRef from argument]
+    C -- merge --> E["targetRef from .git/MERGE_HEAD"]
+    C -- rebase --> F["targetRef from rebase-merge/onto"]
+    D --> G["git merge-base HEAD target → base SHA"]
+    E --> G
+    F --> G
+    G --> H["ls-tree base → baseFiles"]
+    H --> I["ls-tree HEAD → ourFiles"]
+    I --> J["branchOnly = ourFiles − baseFiles"]
+    J --> K{"any branchOnly version ≤ targetMax?"}
+    K -- No --> L([No collision — exit])
+    K -- Yes --> M["Build plan: nextVersion = targetMax + 1"]
+    M --> N["Rename .do / .undo / .test files\nvia git show \"ourRef:path\""]
+    N --> O["Update @migration annotations in backfills"]
+    O --> P["git add"]
+    P --> Q([Done])
+```
 
 #### 3.5.3 Three Operating Modes
 
@@ -183,6 +266,26 @@ When a developer switches from `feature-A` to `feature-B`, their local database 
 5. Read migration files now on disk (the target branch's files) and migrate **up** to the new max.
 
 The down-migration uses the `.undo.sql` files that Postgrator supports. Developers who write undo files get safe branch switching for free. The `--dry-run` flag shows the planned version transitions without touching the database or the working tree.
+
+```mermaid
+sequenceDiagram
+    participant Dev as Developer
+    participant SB as switchBranch
+    participant DB as PostgreSQL
+    participant Git as git
+
+    Dev->>SB: switchBranch(targetBranch)
+    SB->>Git: merge-base HEAD target
+    Git-->>SB: commonAncestor SHA
+    SB->>Git: ls-tree commonAncestor → commonVersion
+    SB->>DB: migrate DOWN to commonVersion
+    DB-->>SB: rolled back
+    SB->>Git: checkout targetBranch
+    Git-->>SB: working tree updated
+    SB->>DB: migrate UP to targetMaxVersion
+    DB-->>SB: applied
+    SB-->>Dev: SwitchBranchResult
+```
 
 ## 4. Implementation
 
