@@ -2,15 +2,11 @@
 
 **Nicholas Adamou — dotbrains**
 
----
-
 ## Abstract
 
 Production database migrations are well-understood: tools like Flyway, Liquibase, and Postgrator apply versioned SQL scripts in order, track applied versions in a schema table, and roll back on failure. Data backfills — operations that transform existing rows after a schema change — are not. The standard practice is to write a raw SQL script and run it manually, with no batching, no safety rails, no resumability, and no coordination with the migrations they depend on. At small data volumes this works. At millions of rows it causes table locks, hours-long outages, and processes that cannot safely be interrupted.
 
 This paper presents sluice, a TypeScript library and CLI that brings production-grade guarantees to PostgreSQL data backfills. sluice makes five technical contributions: (1) a batched execution model that processes rows in chunks using row-level locks, with configurable inter-batch delay; (2) a cycle-detection invariant that catches broken `WHERE` clauses before they produce infinite loops; (3) resume semantics that restart interrupted batch loops from the exact row set left behind, using an idempotent `WHERE` clause as the continuation mechanism; (4) an annotation-driven interleaving system that parses `-- @migration` comments from backfill SQL files to enforce ordering between schema changes and the data transforms that depend on them; and (5) a git-aware version management layer that detects and resolves migration version collisions between feature branches using git plumbing (`merge-base`, `ls-tree`, `cat-file`), and automates the database state transition when switching branches.
-
----
 
 ## 1. Introduction
 
@@ -23,8 +19,6 @@ Beyond execution, backfills have a coordination problem. A backfill that fills i
 Finally, backfills have a developer workflow problem. When two engineers independently add a migration numbered `050` to separate branches, the conflict cannot be resolved by git alone: the files have different names but the same version number, and Postgrator will refuse to apply both. Today the resolution is manual, imprecise, and easy to get wrong — especially during an in-progress merge or rebase where the working tree is in a conflicted state.
 
 sluice addresses all three problems with a unified tool.
-
----
 
 ## 2. Background
 
@@ -65,8 +59,6 @@ Each execution processes at most 25,000 rows. When `rowCount` drops to zero, the
 Modern software teams use feature branches extensively. Each engineer branches from `main`, makes changes, and opens a pull request. When two engineers independently add a migration to the same version slot, a version collision occurs. The file-naming convention (`001.do.sql`, `002.do.sql`, ...) that makes migration ordering unambiguous within a single branch becomes a source of conflicts across branches.
 
 The standard resolution is for one engineer to manually renumber their migration, update any references, and push again. This is error-prone when done under the pressure of a merge conflict, and it is impossible to automate without inspecting the git history to determine which files were added on which branch.
-
----
 
 ## 3. Design
 
@@ -192,8 +184,6 @@ When a developer switches from `feature-A` to `feature-B`, their local database 
 
 The down-migration uses the `.undo.sql` files that Postgrator supports. Developers who write undo files get safe branch switching for free. The `--dry-run` flag shows the planned version transitions without touching the database or the working tree.
 
----
-
 ## 4. Implementation
 
 sluice is implemented in TypeScript targeting CommonJS Node.js. It is published as `@dotbrains/sluice` on GitHub Packages. `pg-promise` is a peer dependency: sluice accepts an existing database instance rather than creating its own connection pool, avoiding duplicate pools and version mismatches in consuming applications.
@@ -203,8 +193,6 @@ The `Database` interface (`src/types.ts`) is a structural subset of `pg-promise`
 Session-level GUCs for trigger bypass are set on a pinned connection via `database.task(...)`, which holds a single physical connection from the pool for the entire backfill run. GUCs are reset in a `finally` block before the connection is returned to the pool, preventing GUC state from leaking to other queries.
 
 The CLI (`src/cli.ts`) is built with Node.js's built-in argument parsing. There are no external CLI framework dependencies. The CLI reads `DATABASE_URL`, `SLUICE_GUCS`, and `SLUICE_BATCH_DELAY_MS` from the environment and delegates to the library functions.
-
----
 
 ## 5. Testing
 
@@ -230,8 +218,6 @@ The CLI (`src/cli.ts`) is built with Node.js's built-in argument parsing. There 
 
 vitest's `globalSetup` runs in a separate Node.js context from test workers. Environment variables set in `globalSetup` do not propagate to test files. sluice solves this with a JSON state file (`test/.pg-container-state.json`) written by `globalSetup` and read by `db-test-utils.ts`. The file is created before any test worker starts and deleted after all tests complete. This is the most reliable cross-context IPC approach in vitest.
 
----
-
 ## 6. Related Work
 
 **Flyway** [1] and **Liquibase** [2] are the dominant schema migration tools in the JVM ecosystem. Both support SQL and Java-based migrations, versioned by filename. Neither supports batched re-execution, resume semantics, or git-aware version management.
@@ -246,8 +232,6 @@ vitest's `globalSetup` runs in a separate Node.js context from test workers. Env
 
 None of the above tools address the combination of batched execution, cycle detection, resumability, annotation-driven ordering, and git-aware version management that sluice provides.
 
----
-
 ## 7. Limitations and Future Work
 
 **Rollback backfills.** sluice does not support reversing a completed backfill. The design assumption is that backfill SQL is idempotent and forward-only. A rollback would require a new backfill file. This is intentional but limits use in environments where reversibility is required.
@@ -260,15 +244,11 @@ None of the above tools address the combination of batched execution, cycle dete
 
 **Automatic `@migration` generation.** The `@migration` annotation must be written manually. A future tool could analyse SQL ASTs to infer which schema objects a backfill depends on and suggest the correct annotation automatically.
 
----
-
 ## 8. Conclusion
 
 sluice addresses a gap between schema migration tooling and the practical needs of production data backfills. The key insight is that batched idempotent SQL, combined with a completion flag in the version table, provides a simple and robust model for resumable, long-running data transforms. The `@migration` annotation extends this model to multi-step pipelines where schema changes and data transforms must be interleaved in a specific order. The git plumbing layer extends it further to multi-branch development workflows where version collisions and database state divergence are everyday occurrences.
 
 Each component is independently useful: the batch loop can be used without the interleaving system; the renumber command can be used without any backfills. Composed together, they eliminate the entire class of manual steps that developers currently perform when deploying schema-coupled data changes to production.
-
----
 
 ## References
 
@@ -287,7 +267,5 @@ Each component is independently useful: the batch loop can be used without the i
 [7] Ruby on Rails. *Active Record Migrations*. https://guides.rubyonrails.org/active_record_migrations.html
 
 [8] Tim Jones. *pg-boss*. https://github.com/timgit/pg-boss
-
----
 
 *sluice is available at https://github.com/dotbrains/sluice under the MIT License.*
