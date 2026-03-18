@@ -10,6 +10,7 @@ import { CodeExamplesSection } from '@/components/sections/CodeExamplesSection';
 import { UseCasesSection } from '@/components/sections/UseCasesSection';
 import { QuickStartSection } from '@/components/sections/QuickStartSection';
 import { CTASection } from '@/components/sections/CTASection';
+import { PaperSection } from '@/components/sections/PaperSection';
 
 export default function Page() {
   const scrollToFeatures = () => {
@@ -26,6 +27,7 @@ export default function Page() {
       <CodeExamplesSection />
       <UseCasesSection />
       <QuickStartSection />
+      <PaperSection />
       <CTASection />
       <MarketingFooter />
     </div>

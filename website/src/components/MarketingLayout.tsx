@@ -49,9 +49,8 @@ export function MarketingNav({ transparent = false }: MarketingNavProps) {
             Use Cases
           </a>
           <a
-            href="https://github.com/dotbrains/sluice/blob/master/PAPER.md"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/#paper"
+            onClick={(e) => handleSmoothScroll(e, '#paper')}
             className="text-cream/80 hover:text-cream transition-colors text-sm font-medium"
           >
             Paper
@@ -112,9 +111,8 @@ export function MarketingNav({ transparent = false }: MarketingNavProps) {
               Use Cases
             </a>
             <a
-              href="https://github.com/dotbrains/sluice/blob/master/PAPER.md"
-              target="_blank"
-              rel="noopener noreferrer"
+              href="/#paper"
+              onClick={(e) => handleSmoothScroll(e, '#paper')}
               className="block text-cream/80 hover:text-cream transition-colors text-base font-medium py-2"
             >
               Paper
