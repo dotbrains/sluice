@@ -2,7 +2,7 @@
   "name": "@dotbrains/sluice",
   "version": "0.1.0",
   "description": "Batched PostgreSQL backfill runner with cycle detection, resume, and migration interleaving",
-  "license": "MIT",
+  "license": "PolyForm-Shield-1.0.0",
   "author": "dotbrains",
   "repository": {
     "type": "git",

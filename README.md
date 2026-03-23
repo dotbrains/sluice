@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/dotbrains/sluice/actions/workflows/ci.yml/badge.svg)](https://github.com/dotbrains/sluice/actions/workflows/ci.yml)
 [![GitHub Package](https://img.shields.io/badge/npm-%40dotbrains%2Fsluice-CB3837?logo=npm)](https://github.com/dotbrains/sluice/packages)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: PolyForm Shield 1.0.0](https://img.shields.io/badge/License-PolyForm%20Shield%201.0.0-blue.svg)](https://polyformproject.org/licenses/shield/1.0.0/)
 
 ![TypeScript](https://img.shields.io/badge/-TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/-PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white)
@@ -175,4 +175,4 @@ A technical paper describing sluice's design and contributions is available in t
 
 ## License
 
-MIT
+This project is licensed under the [PolyForm Shield License 1.0.0](https://polyformproject.org/licenses/shield/1.0.0/) — see [LICENSE](LICENSE) for details.
